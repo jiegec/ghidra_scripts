@@ -66,6 +66,25 @@ if __name__ == '__main__':
     """)
     objc_data = currentProgram.getDataTypeManager().findDataType("/objc_data")
 
+    create_datatype("""
+    struct objc_ivars_list {
+        uint32_t entry_size;
+        uint32_t ivars_count;
+    };
+    """)
+    objc_ivars_list = currentProgram.getDataTypeManager().findDataType("/objc_ivars_list")
+
+    create_datatype("""
+    struct objc_ivar {
+        uint64_t offset;
+        uint64_t name;
+        uint64_t type;
+        uint32_t flag;
+        uint32_t size;
+    };
+    """)
+    objc_ivar = currentProgram.getDataTypeManager().findDataType("/objc_ivar")
+
     cp = currentProgram
 
     # iterate method names
@@ -132,7 +151,7 @@ if __name__ == '__main__':
                     break
 
     # iterate classes
-    classes = []
+    classes = set()
     for seg in cp.memory.blocks:
         if seg.name == '__objc_classlist':
             print('found section {} @ {}, adding labels for classes'.format(
@@ -144,20 +163,24 @@ if __name__ == '__main__':
                     # define obj_class struct
                     class_addr = cu.address.getNewAddress(
                         cu.getValue().getOffset() & 0x7ffffffffffff)
-                    classes.append(class_addr)
+                    classes.add(class_addr)
 
                     # find metaclass
                     data = getDataAt(class_addr)
                     metaclass_addr = cu.address.getNewAddress(
                         data.getLong(0) & 0x7ffffffffffff)
-                    # define obj_class struct
-                    DataUtilities.createData(currentProgram, metaclass_addr, objc_class,
-                                             0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
-                    classes.append(metaclass_addr)
+                    while metaclass_addr not in classes and metaclass_addr.getOffset() >= 0x100000000:
+                        print('find metaclass at {}'.format(metaclass_addr))
+
+                        # recursive
+                        data = getDataAt(metaclass_addr)
+                        metaclass_addr = cu.address.getNewAddress(
+                            data.getLong(0) & 0x7ffffffffffff)
 
                 else:
                     break
 
+    # analyze classes
     for class_addr in classes:
         data = getDataAt(class_addr)
         DataUtilities.createData(currentProgram, class_addr, objc_class,
@@ -205,6 +228,25 @@ if __name__ == '__main__':
                 if imp:
                     imp.setName('{}::{}'.format(
                         class_name, method_name.getValue()), SourceType.ANALYSIS)
+
+        # find ivars
+        ivars_addr_raw = getDataAt(
+            data_addr).getLong(48) & 0x0ffffffffffff
+        ivars_addr = cu.address.getNewAddress(
+            ivars_addr_raw)
+        if ivars_addr_raw != 0:
+            # define objc_ivars_list struct
+            DataUtilities.createData(currentProgram, ivars_addr, objc_ivars_list,
+                                     0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+            ivars_count = getDataAt(ivars_addr).getInt(4)
+            print('ivar at {} {}'.format(ivars_addr, ivars_count))
+
+            # define objc_ivar struct
+            for i in range(ivars_count):
+                ivar_addr = cu.address.getNewAddress(
+                    ivars_addr_raw + 8 + 32 * i)
+                DataUtilities.createData(
+                    currentProgram, ivar_addr, objc_ivar, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
         # create label
         print('processing class {}'.format(class_name))
