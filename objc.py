@@ -235,9 +235,14 @@ if __name__ == '__main__':
                 imp_addr = cu.address.getNewAddress(
                     (getDataAt(method_addr).getLong(16) & 0xfffffffffff) + 0x100000000)
                 imp = getFunctionAt(imp_addr)
+                name = '{}::{}'.format(
+                        class_name, method_name.getValue())
                 if imp:
-                    imp.setName('{}::{}'.format(
-                        class_name, method_name.getValue()), SourceType.ANALYSIS)
+                    imp.setName(name, SourceType.ANALYSIS)
+                else:
+                    print('adding function {} at {}'.format(name, imp_addr))
+                    disassemble(imp_addr)
+                    createFunction(imp_addr, name)
 
         # find ivars
         ivars_addr_raw = getDataAt(
@@ -276,7 +281,6 @@ if __name__ == '__main__':
                     currentProgram, property_addr, objc_property, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
         # create label
-        print('processing class {}'.format(class_name))
         createLabel(cu.address, '{}'.format(class_name), True)
         createLabel(
             class_addr, '{}_class'.format(class_name), True)
