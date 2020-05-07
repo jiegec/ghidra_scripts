@@ -28,62 +28,73 @@ if __name__ == '__main__':
         uint64_t vtable;
         uint64_t data;
     };
-    """)
-    objc_class = currentProgram.getDataTypeManager().findDataType("/objc_class")
-
-    create_datatype("""
     struct objc_method {
-        uint64_t method_name;
-        uint64_t method_type;
-        uint64_t method_imp;
+        uint64_t method_name: 48;
+        uint64_t ignore1: 16;
+        uint64_t method_type: 48;
+        uint64_t ignore2: 16;
+        uint64_t method_imp: 48;
+        uint64_t ignore3: 16;
     };
-    """)
-    objc_method = currentProgram.getDataTypeManager().findDataType("/objc_method")
-
-    create_datatype("""
     struct objc_method_list {
         uint32_t obsolete;
         uint32_t method_count;
     };
-    """)
-    objc_method_list = currentProgram.getDataTypeManager().findDataType("/objc_method_list")
-
-    # class_ro_t in objc-runtime-new.h
-    create_datatype("""
     struct objc_data {
         uint32_t flags;
         uint32_t instance_start;
         uint32_t instance_size;
         uint32_t reserved;
         uint64_t ivar_layout;
-        uint64_t name;
-        uint64_t method_list;
-        uint64_t base_protocols;
-        uint64_t ivars;
+        uint64_t name: 48;
+        uint64_t ignore1: 16;
+        uint64_t method_list: 48;
+        uint64_t ignore2: 16;
+        uint64_t base_protocols: 48;
+        uint64_t ignore3: 16;
+        uint64_t ivars: 48;
+        uint64_t ignore4: 16;
         uint64_t weak_ivar_layout;
-        uint64_t base_properties;
+        uint64_t base_properties: 48;
+        uint64_t ignore5: 16;
     };
-    """)
-    objc_data = currentProgram.getDataTypeManager().findDataType("/objc_data")
-
-    create_datatype("""
     struct objc_ivars_list {
         uint32_t entry_size;
         uint32_t ivars_count;
     };
-    """)
-    objc_ivars_list = currentProgram.getDataTypeManager().findDataType("/objc_ivars_list")
-
-    create_datatype("""
     struct objc_ivar {
-        uint64_t offset;
-        uint64_t name;
-        uint64_t type;
+        uint64_t offset: 48;
+        uint64_t ignore1: 16;
+        uint64_t name: 48;
+        uint64_t ignore2: 16;
+        uint64_t type: 48;
+        uint64_t ignore3: 16;
         uint32_t flag;
         uint32_t size;
     };
+    struct objc_property_list {
+        uint32_t flag;
+        uint32_t property_count;
+    };
+    struct objc_property {
+        uint64_t name: 48;
+        uint64_t ignore1: 16;
+        uint64_t attribute: 48;
+        uint64_t ignore2: 16;
+    };
     """)
+
+    objc_class = currentProgram.getDataTypeManager().findDataType("/objc_class")
+    objc_data = currentProgram.getDataTypeManager().findDataType("/objc_data")
+
+    objc_method = currentProgram.getDataTypeManager().findDataType("/objc_method")
+    objc_method_list = currentProgram.getDataTypeManager().findDataType("/objc_method_list")
+
+    objc_ivars_list = currentProgram.getDataTypeManager().findDataType("/objc_ivars_list")
     objc_ivar = currentProgram.getDataTypeManager().findDataType("/objc_ivar")
+
+    objc_property_list = currentProgram.getDataTypeManager().findDataType("/objc_property_list")
+    objc_property = currentProgram.getDataTypeManager().findDataType("/objc_property")
 
     cp = currentProgram
 
@@ -170,7 +181,6 @@ if __name__ == '__main__':
                     metaclass_addr = cu.address.getNewAddress(
                         data.getLong(0) & 0x7ffffffffffff)
                     while metaclass_addr not in classes and metaclass_addr.getOffset() >= 0x100000000:
-                        print('find metaclass at {}'.format(metaclass_addr))
 
                         # recursive
                         data = getDataAt(metaclass_addr)
@@ -239,7 +249,6 @@ if __name__ == '__main__':
             DataUtilities.createData(currentProgram, ivars_addr, objc_ivars_list,
                                      0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
             ivars_count = getDataAt(ivars_addr).getInt(4)
-            print('ivar at {} {}'.format(ivars_addr, ivars_count))
 
             # define objc_ivar struct
             for i in range(ivars_count):
@@ -247,6 +256,24 @@ if __name__ == '__main__':
                     ivars_addr_raw + 8 + 32 * i)
                 DataUtilities.createData(
                     currentProgram, ivar_addr, objc_ivar, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+
+        # find propertys
+        property_list_addr_raw = getDataAt(
+            data_addr).getLong(64) & 0x0ffffffffffff
+        property_list_addr = cu.address.getNewAddress(
+            property_list_addr_raw)
+        if property_list_addr_raw != 0:
+            # define objc_property_list struct
+            DataUtilities.createData(currentProgram, property_list_addr, objc_property_list,
+                                     0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+            property_count = getDataAt(property_list_addr).getInt(4)
+
+            # define objc_property struct
+            for i in range(property_count):
+                property_addr = cu.address.getNewAddress(
+                    property_list_addr_raw + 8 + 16 * i)
+                DataUtilities.createData(
+                    currentProgram, property_addr, objc_property, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
         # create label
         print('processing class {}'.format(class_name))
