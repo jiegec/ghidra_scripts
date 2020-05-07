@@ -2,6 +2,7 @@ import re
 from ghidra.program.model.data import DataTypeConflictHandler
 from ghidra.program.model.data import EndianSettingsDefinition
 from ghidra.program.model.data import DataUtilities
+from ghidra.program.model.symbol import SourceType
 from ghidra.app.util.cparser.C import CParser
 
 # https://reverseengineering.stackexchange.com/questions/23330/ghidra-python-create-struct-with-big-endian-field
@@ -141,6 +142,8 @@ if __name__ == '__main__':
                     # define obj_data struct
                     DataUtilities.createData(currentProgram, data_addr, objc_data, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
                     name_addr = cu.address.getNewAddress(getDataAt(data_addr).getLong(24) & 0x0ffffffffffff)
+                    class_name = getDataAt(name_addr).getValue()
+
 
                     # find method list
                     method_list_addr_raw = getDataAt(data_addr).getLong(32) & 0x0ffffffffffff
@@ -152,16 +155,23 @@ if __name__ == '__main__':
 
                         # define objc_method struct
                         for i in range(method_count):
-                            method_addr = method_list_addr_raw + 8 + 24 * i
-                            DataUtilities.createData(currentProgram, cu.address.getNewAddress(method_addr), objc_method, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                            method_addr = cu.address.getNewAddress(method_list_addr_raw + 8 + 24 * i)
+                            DataUtilities.createData(currentProgram, method_addr, objc_method, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                            method_name_addr = cu.address.getNewAddress(getDataAt(method_addr).getLong(0) & 0x7fffffffffff)
+                            method_name = getDataAt(method_name_addr)
+                            createLabel(method_addr, '{}::{}'.format(class_name, method_name.getValue()), True)
+
+                            # get imp addr
+                            imp_addr = cu.address.getNewAddress((getDataAt(method_addr).getLong(16) & 0xfffffffffff) + 0x100000000)
+                            imp = getFunctionAt(imp_addr)
+                            if imp:
+                                imp.setName('{}:{}'.format(class_name, method_name.getValue()), SourceType.ANALYSIS)
                     
                     # create label
-                    if getDataAt(name_addr):
-                        createLabel(cu.address, '{}'.format(getDataAt(name_addr).getValue()), True)
-                        createLabel(class_addr, '{}_class'.format(getDataAt(name_addr).getValue()), True)
-                        createLabel(data_addr, '{}_data'.format(getDataAt(name_addr).getValue()), True)
-                        if method_list_addr_raw != 0:
-                            createLabel(method_list_addr, '{}_method_list'.format(getDataAt(name_addr).getValue()), True)
-                    print('{} @ {}: {} {} {} {} {} {} {}'.format(cu.address, cu.value, metaclass_addr, metaclass, data_addr, name_addr, getDataAt(name_addr), method_list_addr, method_count))
+                    createLabel(cu.address, '{}'.format(class_name), True)
+                    createLabel(class_addr, '{}_class'.format(class_name), True)
+                    createLabel(data_addr, '{}_data'.format(class_name), True)
+                    if method_list_addr_raw != 0:
+                        createLabel(method_list_addr, '{}_method_list'.format(getDataAt(name_addr).getValue()), True)
                 else:
                     break
