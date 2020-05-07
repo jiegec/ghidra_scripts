@@ -6,12 +6,16 @@ from ghidra.program.model.symbol import SourceType
 from ghidra.app.util.cparser.C import CParser
 
 # https://reverseengineering.stackexchange.com/questions/23330/ghidra-python-create-struct-with-big-endian-field
+
+
 def create_datatype(txt):
     data_type_manager = currentProgram.getDataTypeManager()
     parser = CParser(data_type_manager)
     parsed_datatype = parser.parse(txt)
-    datatype = data_type_manager.addDataType(parsed_datatype, DataTypeConflictHandler.DEFAULT_HANDLER)
+    datatype = data_type_manager.addDataType(
+        parsed_datatype, DataTypeConflictHandler.DEFAULT_HANDLER)
     return datatype
+
 
 if __name__ == '__main__':
 
@@ -34,7 +38,7 @@ if __name__ == '__main__':
         uint64_t method_imp;
     };
     """)
-    objc_method= currentProgram.getDataTypeManager().findDataType("/objc_method")
+    objc_method = currentProgram.getDataTypeManager().findDataType("/objc_method")
 
     create_datatype("""
     struct objc_method_list {
@@ -67,7 +71,8 @@ if __name__ == '__main__':
     method_names = {}
     for seg in cp.memory.blocks:
         if seg.name == '__objc_methname':
-            print('found section {} @ {}, collecting method names'.format(seg.name, seg.start))
+            print('found section {} @ {}, collecting method names'.format(
+                seg.name, seg.start))
             codeUnits = cp.getListing().getCodeUnits(seg.start, True)
             while codeUnits.hasNext():
                 cu = codeUnits.next()
@@ -79,14 +84,17 @@ if __name__ == '__main__':
     # iterate selectors
     for seg in cp.memory.blocks:
         if seg.name == '__objc_selrefs':
-            print('found section {} @ {}, adding labels for selectors'.format(seg.name, seg.start))
+            print('found section {} @ {}, adding labels for selectors'.format(
+                seg.name, seg.start))
             codeUnits = cp.getListing().getCodeUnits(seg.start, True)
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
-                    real_addr = cu.address.getNewAddress(cu.getLong(0) & 0x7ffffffffffff)
+                    real_addr = cu.address.getNewAddress(
+                        cu.getLong(0) & 0x7ffffffffffff)
                     if real_addr in method_names:
-                        createLabel(cu.address, '@selector({})'.format(method_names[real_addr]), True)
+                        createLabel(cu.address, '@selector({})'.format(
+                            method_names[real_addr]), True)
                 else:
                     break
 
@@ -94,7 +102,8 @@ if __name__ == '__main__':
     strings = {}
     for seg in cp.memory.blocks:
         if seg.name == '__cstring':
-            print('found section {} @ {}, collecting for strings'.format(seg.name, seg.start))
+            print('found section {} @ {}, collecting for strings'.format(
+                seg.name, seg.start))
             codeUnits = cp.getListing().getCodeUnits(seg.start, True)
             while codeUnits.hasNext():
                 cu = codeUnits.next()
@@ -106,72 +115,93 @@ if __name__ == '__main__':
     # iterate cfstrings
     for seg in cp.memory.blocks:
         if seg.name == '__cfstring':
-            print('found section {} @ {}, adding labels for strings'.format(seg.name, seg.start))
+            print('found section {} @ {}, adding labels for strings'.format(
+                seg.name, seg.start))
             codeUnits = cp.getListing().getCodeUnits(seg.start, True)
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
-                    real_addr = cu.address.getNewAddress(cu.getLong(16) & 0x0fffffffffffff)
+                    real_addr = cu.address.getNewAddress(
+                        cu.getLong(16) & 0x0fffffffffffff)
                     string = getDataAt(real_addr).getValue()
-                    string = re.sub(r'[^0-9a-zA-Z:@%]','_', string)
-                    createLabel(cu.address, '@cfstring({})'.format(string), True)
+                    string = re.sub(r'[^0-9a-zA-Z:@%]', '_', string)
+                    createLabel(
+                        cu.address, '@cfstring({})'.format(string), True)
                 else:
                     break
 
     # iterate classes
     for seg in cp.memory.blocks:
         if seg.name == '__objc_classlist':
-            print('found section {} @ {}, adding labels for classes'.format(seg.name, seg.start))
+            print('found section {} @ {}, adding labels for classes'.format(
+                seg.name, seg.start))
             codeUnits = cp.getListing().getCodeUnits(seg.start, True)
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define obj_class struct
-                    class_addr = cu.address.getNewAddress(cu.getValue().getOffset() & 0x7ffffffffffff)
-                    DataUtilities.createData(currentProgram, class_addr, objc_class, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                    class_addr = cu.address.getNewAddress(
+                        cu.getValue().getOffset() & 0x7ffffffffffff)
+                    DataUtilities.createData(currentProgram, class_addr, objc_class,
+                                             0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
                     # find metaclass
                     data = getDataAt(class_addr)
-                    metaclass_addr = cu.address.getNewAddress(data.getLong(0) & 0x7ffffffffffff)
+                    metaclass_addr = cu.address.getNewAddress(
+                        data.getLong(0) & 0x7ffffffffffff)
                     # define obj_class struct
-                    DataUtilities.createData(currentProgram, metaclass_addr, objc_class, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                    DataUtilities.createData(currentProgram, metaclass_addr, objc_class,
+                                             0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
                     metaclass = getDataAt(metaclass_addr)
 
                     # find data
-                    data_addr = cu.address.getNewAddress(data.getLong(32) & 0x7ffffffffffff)
+                    data_addr = cu.address.getNewAddress(
+                        data.getLong(32) & 0x7ffffffffffff)
                     # define obj_data struct
-                    DataUtilities.createData(currentProgram, data_addr, objc_data, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
-                    name_addr = cu.address.getNewAddress(getDataAt(data_addr).getLong(24) & 0x0ffffffffffff)
+                    DataUtilities.createData(currentProgram, data_addr, objc_data,
+                                             0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                    name_addr = cu.address.getNewAddress(
+                        getDataAt(data_addr).getLong(24) & 0x0ffffffffffff)
                     class_name = getDataAt(name_addr).getValue()
 
-
                     # find method list
-                    method_list_addr_raw = getDataAt(data_addr).getLong(32) & 0x0ffffffffffff
-                    method_list_addr = cu.address.getNewAddress(method_list_addr_raw)
+                    method_list_addr_raw = getDataAt(
+                        data_addr).getLong(32) & 0x0ffffffffffff
+                    method_list_addr = cu.address.getNewAddress(
+                        method_list_addr_raw)
                     if method_list_addr_raw != 0:
                         # define objc_method_list struct
                         method_count = getDataAt(method_list_addr).getInt(4)
-                        DataUtilities.createData(currentProgram, method_list_addr, objc_method_list, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                        DataUtilities.createData(currentProgram, method_list_addr, objc_method_list,
+                                                 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
                         # define objc_method struct
                         for i in range(method_count):
-                            method_addr = cu.address.getNewAddress(method_list_addr_raw + 8 + 24 * i)
-                            DataUtilities.createData(currentProgram, method_addr, objc_method, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
-                            method_name_addr = cu.address.getNewAddress(getDataAt(method_addr).getLong(0) & 0x7fffffffffff)
+                            method_addr = cu.address.getNewAddress(
+                                method_list_addr_raw + 8 + 24 * i)
+                            DataUtilities.createData(
+                                currentProgram, method_addr, objc_method, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                            method_name_addr = cu.address.getNewAddress(
+                                getDataAt(method_addr).getLong(0) & 0x7fffffffffff)
                             method_name = getDataAt(method_name_addr)
-                            createLabel(method_addr, '{}::{}'.format(class_name, method_name.getValue()), True)
+                            createLabel(method_addr, '{}::{}'.format(
+                                class_name, method_name.getValue()), True)
 
                             # get imp addr
-                            imp_addr = cu.address.getNewAddress((getDataAt(method_addr).getLong(16) & 0xfffffffffff) + 0x100000000)
+                            imp_addr = cu.address.getNewAddress(
+                                (getDataAt(method_addr).getLong(16) & 0xfffffffffff) + 0x100000000)
                             imp = getFunctionAt(imp_addr)
                             if imp:
-                                imp.setName('{}:{}'.format(class_name, method_name.getValue()), SourceType.ANALYSIS)
-                    
+                                imp.setName('{}::{}'.format(
+                                    class_name, method_name.getValue()), SourceType.ANALYSIS)
+
                     # create label
                     createLabel(cu.address, '{}'.format(class_name), True)
-                    createLabel(class_addr, '{}_class'.format(class_name), True)
+                    createLabel(
+                        class_addr, '{}_class'.format(class_name), True)
                     createLabel(data_addr, '{}_data'.format(class_name), True)
                     if method_list_addr_raw != 0:
-                        createLabel(method_list_addr, '{}_method_list'.format(getDataAt(name_addr).getValue()), True)
+                        createLabel(method_list_addr, '{}_method_list'.format(
+                            getDataAt(name_addr).getValue()), True)
                 else:
                     break
