@@ -123,7 +123,17 @@ if __name__ == '__main__':
     objc_property = getDataType("/objc_property")
 
     cp = currentProgram
+    # 48 bits
     mask = 0xffffffffffff
+
+    min_addr = min([seg.start for seg in cp.memory.blocks])
+    max_addr = max([seg.end for seg in cp.memory.blocks])
+    print('addr range from {} to {}'.format(min_addr, max_addr))
+
+    # find __TEXT section
+    for seg in cp.memory.blocks:
+        if seg.name == '__TEXT':
+            text_section_addr = seg.start.getOffset()
 
     # iterate method names
     method_names = {}
@@ -203,7 +213,6 @@ if __name__ == '__main__':
                     # define obj_class struct
                     class_addr = toAddress(
                         cu.getValue().getOffset() & mask)
-                    print('{}'.format(class_addr))
                     setData(class_addr, objc_class)
                     classes.add(class_addr)
 
@@ -211,7 +220,7 @@ if __name__ == '__main__':
                     data = getDataAt(class_addr)
                     metaclass_addr = toAddress(
                         data.getLong(0) & mask)
-                    while metaclass_addr not in classes and metaclass_addr.getOffset() >= 0x100000000:
+                    while metaclass_addr not in classes and metaclass_addr.getOffset() >= min_addr:
 
                         # recursive
                         setData(metaclass_addr, objc_class)
@@ -260,7 +269,7 @@ if __name__ == '__main__':
 
                 # get imp addr
                 imp_addr = toAddress(
-                    (getDataAt(method_addr).getLong(16) & mask) + 0x100000000)
+                    (getDataAt(method_addr).getLong(16) & mask) + text_section_addr)
                 imp = getFunctionAt(imp_addr)
                 name = '{}::{}'.format(
                     class_name, method_name.getValue())
