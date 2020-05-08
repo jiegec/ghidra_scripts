@@ -438,10 +438,17 @@ if __name__ == '__main__':
                     createLabel(protocol_addr, 'protocol_{}'.format(
                         protocol_name), True)
 
-                    # parse method list
-                    method_list_addr_raw = getDataAt(protocol_addr).getLong(24) & mask
-                    if min_addr.getOffset() < method_list_addr_raw and method_list_addr_raw < max_addr.getOffset():
-                        parseMethodList(method_list_addr_raw, protocol_name)
+                    # parse instance method list
+                    instance_method_list_addr_raw = getDataAt(protocol_addr).getLong(24) & mask
+                    if min_addr.getOffset() < instance_method_list_addr_raw and instance_method_list_addr_raw < max_addr.getOffset():
+                        parseMethodList(
+                            instance_method_list_addr_raw, protocol_name)
+
+                    # parse class method list
+                    class_method_list_addr_raw = getDataAt(protocol_addr).getLong(32) & mask
+                    if min_addr.getOffset() < class_method_list_addr_raw and class_method_list_addr_raw < max_addr.getOffset():
+                        parseMethodList(
+                            class_method_list_addr_raw, protocol_name)
 
                 else:
                     break
