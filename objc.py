@@ -30,6 +30,44 @@ def setData(addr, ty):
         currentProgram, addr, ty, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
 
+def parseMethodList(method_list_addr_raw, class_name):
+    method_list_addr = cu.address.getNewAddress(
+        method_list_addr_raw)
+    if method_list_addr_raw != 0:
+        # define objc_method_list struct
+        setData(method_list_addr, objc_method_list)
+
+        method_count = getDataAt(method_list_addr).getInt(4)
+
+        # define objc_method struct
+        for i in range(method_count):
+            method_addr = toAddress(
+                method_list_addr_raw + 8 + 24 * i)
+            setData(method_addr, objc_method)
+            method_name_addr = toAddress(
+                getDataAt(method_addr).getLong(0) & mask)
+            method_name = getDataAt(method_name_addr)
+            createLabel(method_addr, 'method_{}::{}'.format(
+                class_name, method_name.getValue()), True)
+
+            # get imp addr
+            imp_addr = toAddress(
+                (getDataAt(method_addr).getLong(16) & mask) + text_section_addr)
+            if min_addr < imp_addr and imp_addr < max_addr:
+                imp = getFunctionAt(imp_addr)
+                name = 'method_{}::{}'.format(
+                    class_name, method_name.getValue())
+                if imp:
+                    imp.setName(name, SourceType.ANALYSIS)
+                else:
+                    print('adding function {} at {}'.format(name, imp_addr))
+                    disassemble(imp_addr)
+                    createFunction(imp_addr, name)
+
+        createLabel(method_list_addr, 'method_list_{}'.format(
+            class_name), True)
+
+
 if __name__ == '__main__':
 
     # https://opensource.apple.com/source/objc4/objc4-237/runtime/objc-class.h.auto.html
@@ -303,37 +341,7 @@ if __name__ == '__main__':
         # find method list
         method_list_addr_raw = getDataAt(
             data_addr).getLong(32) & mask
-        method_list_addr = cu.address.getNewAddress(
-            method_list_addr_raw)
-        if method_list_addr_raw != 0:
-            # define objc_method_list struct
-            setData(method_list_addr, objc_method_list)
-
-            method_count = getDataAt(method_list_addr).getInt(4)
-
-            # define objc_method struct
-            for i in range(method_count):
-                method_addr = toAddress(
-                    method_list_addr_raw + 8 + 24 * i)
-                setData(method_addr, objc_method)
-                method_name_addr = toAddress(
-                    getDataAt(method_addr).getLong(0) & mask)
-                method_name = getDataAt(method_name_addr)
-                createLabel(method_addr, 'method_{}::{}'.format(
-                    class_name, method_name.getValue()), True)
-
-                # get imp addr
-                imp_addr = toAddress(
-                    (getDataAt(method_addr).getLong(16) & mask) + text_section_addr)
-                imp = getFunctionAt(imp_addr)
-                name = 'method_{}::{}'.format(
-                    class_name, method_name.getValue())
-                if imp:
-                    imp.setName(name, SourceType.ANALYSIS)
-                else:
-                    print('adding function {} at {}'.format(name, imp_addr))
-                    disassemble(imp_addr)
-                    createFunction(imp_addr, name)
+        parseMethodList(method_list_addr_raw, class_name)
 
         # find ivars
         ivars_addr_raw = getDataAt(
@@ -352,7 +360,8 @@ if __name__ == '__main__':
                 setData(ivar_addr, objc_ivar)
 
                 # get ivar name
-                ivar_name_addr = toAddress(getDataAt(ivar_addr).getLong(8) & mask)
+                ivar_name_addr = toAddress(
+                    getDataAt(ivar_addr).getLong(8) & mask)
                 ivar_name = getDataAt(ivar_name_addr).getValue()
                 createLabel(ivar_addr, 'ivar_{}::{}'.format(
                     getDataAt(name_addr).getValue(), ivar_name), True)
@@ -374,7 +383,8 @@ if __name__ == '__main__':
                 setData(property_addr, objc_property)
 
                 # get property name
-                property_name_addr = toAddress(getDataAt(property_addr).getLong(0) & mask)
+                property_name_addr = toAddress(
+                    getDataAt(property_addr).getLong(0) & mask)
                 property_name = getDataAt(property_name_addr).getValue()
                 createLabel(property_addr, 'property_{}::{}'.format(
                     getDataAt(name_addr).getValue(), property_name), True)
@@ -384,9 +394,6 @@ if __name__ == '__main__':
         createLabel(
             class_addr, 'class_{}'.format(class_name), True)
         createLabel(data_addr, 'data_{}'.format(class_name), True)
-        if method_list_addr_raw != 0:
-            createLabel(method_list_addr, 'method_list_{}'.format(
-                getDataAt(name_addr).getValue()), True)
 
     # iterate class refs
     for seg in cp.memory.blocks:
@@ -427,7 +434,14 @@ if __name__ == '__main__':
                     setData(protocol_addr, objc_protocol)
                     name_addr = toAddress(
                         getDataAt(protocol_addr).getLong(8) & mask)
-                    createLabel(protocol_addr, 'protocol_{}'.format(getDataAt(name_addr).getValue()), True)
+                    protocol_name = getDataAt(name_addr).getValue()
+                    createLabel(protocol_addr, 'protocol_{}'.format(
+                        protocol_name), True)
+
+                    # parse method list
+                    method_list_addr_raw = getDataAt(protocol_addr).getLong(24) & mask
+                    if min_addr.getOffset() < method_list_addr_raw and method_list_addr_raw < max_addr.getOffset():
+                        parseMethodList(method_list_addr_raw, protocol_name)
 
                 else:
                     break
