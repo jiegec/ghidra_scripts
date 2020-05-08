@@ -6,8 +6,7 @@ from ghidra.app.util.cparser.C import CParser
 
 # https://reverseengineering.stackexchange.com/questions/23330/ghidra-python-create-struct-with-big-endian-field
 
-
-def createDataType(txt):
+def create_data_type(txt):
     data_type_manager = currentProgram.getDataTypeManager()
     parser = CParser(data_type_manager)
     parsed_datatype = parser.parse(txt)
@@ -20,14 +19,13 @@ def getDataType(name):
     return currentProgram.getDataTypeManager().findDataType(name)
 
 
-def toAddress(addr):
+def to_address(addr):
     return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(addr)
 
 
 def set_data(addr, ty):
     DataUtilities.createData(
         currentProgram, addr, ty, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
-
 
 def parse_method_list(method_list_addr_raw, class_name):
     if not (min_addr.getOffset() < method_list_addr_raw and method_list_addr_raw < max_addr.getOffset()):
@@ -43,17 +41,17 @@ def parse_method_list(method_list_addr_raw, class_name):
 
         # define objc_method struct
         for i in range(method_count):
-            method_addr = toAddress(
+            method_addr = to_address(
                 method_list_addr_raw + 8 + 24 * i)
             set_data(method_addr, objc_method)
-            method_name_addr = toAddress(
+            method_name_addr = to_address(
                 getDataAt(method_addr).getLong(0) & mask)
             method_name = getDataAt(method_name_addr)
             createLabel(method_addr, 'method_{}::{}'.format(
                 class_name, method_name.getValue()), True)
 
             # get imp addr
-            imp_addr = toAddress(
+            imp_addr = to_address(
                 (getDataAt(method_addr).getLong(16) & mask) + text_section_addr)
             if min_addr < imp_addr and imp_addr < max_addr:
                 imp = getFunctionAt(imp_addr)
@@ -73,7 +71,7 @@ def parse_method_list(method_list_addr_raw, class_name):
 if __name__ == '__main__':
 
     # https://opensource.apple.com/source/objc4/objc4-237/runtime/objc-class.h.auto.html
-    createDataType("""
+    create_data_type("""
     struct objc_class {
         uint64_t metaclass: 48;
         uint64_t ignore1: 16;
@@ -87,7 +85,7 @@ if __name__ == '__main__':
         uint64_t ignore5: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_method {
         uint64_t method_name: 48;
         uint64_t ignore1: 16;
@@ -97,13 +95,13 @@ if __name__ == '__main__':
         uint64_t ignore3: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_method_list {
         uint32_t obsolete;
         uint32_t method_count;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_data {
         uint32_t flags;
         uint32_t instance_start;
@@ -123,13 +121,13 @@ if __name__ == '__main__':
         uint64_t ignore5: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_ivars_list {
         uint32_t entry_size;
         uint32_t ivars_count;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_ivar {
         uint64_t offset: 48;
         uint64_t ignore1: 16;
@@ -141,13 +139,13 @@ if __name__ == '__main__':
         uint32_t size;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_property_list {
         uint32_t flag;
         uint32_t property_count;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_property {
         uint64_t name: 48;
         uint64_t ignore1: 16;
@@ -155,19 +153,19 @@ if __name__ == '__main__':
         uint64_t ignore2: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_class_ref {
         uint64_t ref: 48;
         uint64_t ignore1: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_ref {
         uint64_t ref: 48;
         uint64_t ignore1: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_cfstring {
         uint64_t isa: 48;
         uint64_t ignore1: 16;
@@ -177,7 +175,7 @@ if __name__ == '__main__':
         uint64_t len;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_protocol {
         uint64_t isa: 48;
         uint64_t ignore1: 16;
@@ -205,7 +203,7 @@ if __name__ == '__main__':
         uint64_t ignore12: 16;
     };
     """)
-    createDataType("""
+    create_data_type("""
     struct objc_protocol_list {
         uint32_t protocol_count;
     };
@@ -267,7 +265,7 @@ if __name__ == '__main__':
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
-                    real_addr = toAddress(
+                    real_addr = to_address(
                         cu.getLong(0) & mask)
                     if real_addr in method_names:
                         # define obj_ref struct
@@ -302,7 +300,7 @@ if __name__ == '__main__':
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
-                    real_addr = toAddress(
+                    real_addr = to_address(
                         cu.getLong(16) & mask)
                     string = getDataAt(real_addr).getValue()
                     string = re.sub(r'[^0-9a-zA-Z:@%;.,]', '_', string)
@@ -323,21 +321,21 @@ if __name__ == '__main__':
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define obj_class struct
-                    class_addr = toAddress(
+                    class_addr = to_address(
                         cu.getValue().getOffset() & mask)
                     set_data(class_addr, objc_class)
                     classes.add(class_addr)
 
                     # find metaclass
                     data = getDataAt(class_addr)
-                    metaclass_addr = toAddress(
+                    metaclass_addr = to_address(
                         data.getLong(0) & mask)
                     while metaclass_addr not in classes and metaclass_addr.getOffset() >= min_addr:
 
                         # recursive
                         set_data(metaclass_addr, objc_class)
                         data = getDataAt(metaclass_addr)
-                        metaclass_addr = toAddress(
+                        metaclass_addr = to_address(
                             data.getLong(0) & mask)
 
                 else:
@@ -349,11 +347,11 @@ if __name__ == '__main__':
         set_data(class_addr, objc_class)
 
         # find data
-        data_addr = toAddress(
+        data_addr = to_address(
             data.getLong(32) & mask)
         # define obj_data struct
         set_data(data_addr, objc_data)
-        name_addr = toAddress(
+        name_addr = to_address(
             getDataAt(data_addr).getLong(24) & mask)
         class_name = getDataAt(name_addr).getValue()
 
@@ -366,7 +364,7 @@ if __name__ == '__main__':
         base_protocols_addr_raw = getDataAt(
             data_addr).getLong(40) & mask
         if base_protocols_addr_raw != 0:
-            base_protocols_addr = toAddress(
+            base_protocols_addr = to_address(
                 base_protocols_addr_raw)
             # define objc_protocol_list struct
             set_data(base_protocols_addr, objc_protocol_list)
@@ -375,14 +373,14 @@ if __name__ == '__main__':
 
             # define objc_ref struct
             for i in range(protocol_count):
-                protocol_ref_addr = toAddress(
+                protocol_ref_addr = to_address(
                     base_protocols_addr_raw + 4 + 4 * i)
                 set_data(protocol_ref_addr, objc_ref)
 
         # find ivars
         ivars_addr_raw = getDataAt(
             data_addr).getLong(48) & mask
-        ivars_addr = toAddress(
+        ivars_addr = to_address(
             ivars_addr_raw)
         if ivars_addr_raw != 0:
             # define objc_ivars_list struct
@@ -391,12 +389,12 @@ if __name__ == '__main__':
 
             # define objc_ivar struct
             for i in range(ivars_count):
-                ivar_addr = toAddress(
+                ivar_addr = to_address(
                     ivars_addr_raw + 8 + 32 * i)
                 set_data(ivar_addr, objc_ivar)
 
                 # get ivar name
-                ivar_name_addr = toAddress(
+                ivar_name_addr = to_address(
                     getDataAt(ivar_addr).getLong(8) & mask)
                 ivar_name = getDataAt(ivar_name_addr).getValue()
                 createLabel(ivar_addr, 'ivar_{}::{}'.format(
@@ -405,7 +403,7 @@ if __name__ == '__main__':
         # find property_list
         property_list_addr_raw = getDataAt(
             data_addr).getLong(64) & mask
-        property_list_addr = toAddress(
+        property_list_addr = to_address(
             property_list_addr_raw)
         if property_list_addr_raw != 0:
             # define objc_property_list struct
@@ -414,12 +412,12 @@ if __name__ == '__main__':
 
             # define objc_property struct
             for i in range(property_count):
-                property_addr = toAddress(
+                property_addr = to_address(
                     property_list_addr_raw + 8 + 16 * i)
                 set_data(property_addr, objc_property)
 
                 # get property name
-                property_name_addr = toAddress(
+                property_name_addr = to_address(
                     getDataAt(property_addr).getLong(0) & mask)
                 property_name = getDataAt(property_name_addr).getValue()
                 createLabel(property_addr, 'property_{}::{}'.format(
@@ -445,7 +443,7 @@ if __name__ == '__main__':
 
                     # find class
                     class_addr_raw = cu.getLong(0) & mask
-                    class_obj = getDataAt(toAddress(class_addr_raw))
+                    class_obj = getDataAt(to_address(class_addr_raw))
                     if class_obj:
                         createLabel(cu.address, 'ref_{}'.format(
                             class_obj.getLabel()), True)
@@ -466,9 +464,9 @@ if __name__ == '__main__':
                     set_data(cu.address, objc_ref)
 
                     # parse protocol
-                    protocol_addr = toAddress(cu.getLong(0) & mask)
+                    protocol_addr = to_address(cu.getLong(0) & mask)
                     set_data(protocol_addr, objc_protocol)
-                    name_addr = toAddress(
+                    name_addr = to_address(
                         getDataAt(protocol_addr).getLong(8) & mask)
                     protocol_name = getDataAt(name_addr).getValue()
                     createLabel(protocol_addr, 'protocol_{}'.format(
