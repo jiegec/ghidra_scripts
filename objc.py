@@ -122,6 +122,16 @@ if __name__ == '__main__':
         uint64_t ignore1: 16;
     };
     """)
+    createDataType("""
+    struct objc_cfstring {
+        uint64_t isa: 48;
+        uint64_t ignore1: 16;
+        uint64_t flags;
+        uint64_t content: 48;
+        uint64_t ignore2: 16;
+        uint64_t len;
+    };
+    """)
 
     objc_class = getDataType("/objc_class")
     objc_data = getDataType("/objc_data")
@@ -136,6 +146,7 @@ if __name__ == '__main__':
     objc_property = getDataType("/objc_property")
 
     objc_ref = getDataType("/objc_ref")
+    objc_cfstring = getDataType("/objc_cfstring")
     uint32_t = getDataType("/dword")
 
     cp = currentProgram
@@ -213,9 +224,10 @@ if __name__ == '__main__':
                     real_addr = toAddress(
                         cu.getLong(16) & mask)
                     string = getDataAt(real_addr).getValue()
-                    string = re.sub(r'[^0-9a-zA-Z:@%]', '_', string)
+                    string = re.sub(r'[^0-9a-zA-Z:@%;.]', '_', string)
                     createLabel(
                         cu.address, 'cfstring_{}'.format(string), True)
+                    setData(cu.address, objc_cfstring)
                 else:
                     break
 
