@@ -24,6 +24,10 @@ def getDataType(name):
 def toAddress(addr):
     return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(addr)
 
+def setData(addr, ty):
+    DataUtilities.createData(
+        currentProgram, addr, ty, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+
 
 if __name__ == '__main__':
 
@@ -36,6 +40,8 @@ if __name__ == '__main__':
         uint64_t vtable;
         uint64_t data;
     };
+    """)
+    createDataType("""
     struct objc_method {
         uint64_t method_name: 48;
         uint64_t ignore1: 16;
@@ -44,10 +50,14 @@ if __name__ == '__main__':
         uint64_t method_imp: 48;
         uint64_t ignore3: 16;
     };
+    """)
+    createDataType("""
     struct objc_method_list {
         uint32_t obsolete;
         uint32_t method_count;
     };
+    """)
+    createDataType("""
     struct objc_data {
         uint32_t flags;
         uint32_t instance_start;
@@ -66,10 +76,14 @@ if __name__ == '__main__':
         uint64_t base_properties: 48;
         uint64_t ignore5: 16;
     };
+    """)
+    createDataType("""
     struct objc_ivars_list {
         uint32_t entry_size;
         uint32_t ivars_count;
     };
+    """)
+    createDataType("""
     struct objc_ivar {
         uint64_t offset: 48;
         uint64_t ignore1: 16;
@@ -80,10 +94,14 @@ if __name__ == '__main__':
         uint32_t flag;
         uint32_t size;
     };
+    """)
+    createDataType("""
     struct objc_property_list {
         uint32_t flag;
         uint32_t property_count;
     };
+    """)
+    createDataType("""
     struct objc_property {
         uint64_t name: 48;
         uint64_t ignore1: 16;
@@ -185,6 +203,8 @@ if __name__ == '__main__':
                     # define obj_class struct
                     class_addr = toAddress(
                         cu.getValue().getOffset() & mask)
+                    print('{}'.format(class_addr))
+                    setData(class_addr, objc_class)
                     classes.add(class_addr)
 
                     # find metaclass
@@ -194,6 +214,7 @@ if __name__ == '__main__':
                     while metaclass_addr not in classes and metaclass_addr.getOffset() >= 0x100000000:
 
                         # recursive
+                        setData(metaclass_addr, objc_class)
                         data = getDataAt(metaclass_addr)
                         metaclass_addr = toAddress(
                             data.getLong(0) & mask)
@@ -204,15 +225,13 @@ if __name__ == '__main__':
     # analyze classes
     for class_addr in classes:
         data = getDataAt(class_addr)
-        DataUtilities.createData(currentProgram, class_addr, objc_class,
-                                 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+        setData(class_addr, objc_class)
 
         # find data
         data_addr = toAddress(
             data.getLong(32) & mask)
         # define obj_data struct
-        DataUtilities.createData(currentProgram, data_addr, objc_data,
-                                 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+        setData(data_addr, objc_data)
         name_addr = toAddress(
             getDataAt(data_addr).getLong(24) & mask)
         class_name = getDataAt(name_addr).getValue()
@@ -224,8 +243,7 @@ if __name__ == '__main__':
             method_list_addr_raw)
         if method_list_addr_raw != 0:
             # define objc_method_list struct
-            DataUtilities.createData(currentProgram, method_list_addr, objc_method_list,
-                                     0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+            setData(method_list_addr, objc_method_list)
 
             method_count = getDataAt(method_list_addr).getInt(4)
 
@@ -233,8 +251,7 @@ if __name__ == '__main__':
             for i in range(method_count):
                 method_addr = toAddress(
                     method_list_addr_raw + 8 + 24 * i)
-                DataUtilities.createData(
-                    currentProgram, method_addr, objc_method, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                setData(method_addr, objc_method)
                 method_name_addr = toAddress(
                     getDataAt(method_addr).getLong(0) & mask)
                 method_name = getDataAt(method_name_addr)
@@ -261,16 +278,14 @@ if __name__ == '__main__':
             ivars_addr_raw)
         if ivars_addr_raw != 0:
             # define objc_ivars_list struct
-            DataUtilities.createData(currentProgram, ivars_addr, objc_ivars_list,
-                                     0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+            setData(ivars_addr, objc_ivars_list)
             ivars_count = getDataAt(ivars_addr).getInt(4)
 
             # define objc_ivar struct
             for i in range(ivars_count):
                 ivar_addr = toAddress(
                     ivars_addr_raw + 8 + 32 * i)
-                DataUtilities.createData(
-                    currentProgram, ivar_addr, objc_ivar, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                setData(ivar_addr, objc_ivar)
 
         # find propertys
         property_list_addr_raw = getDataAt(
@@ -279,16 +294,14 @@ if __name__ == '__main__':
             property_list_addr_raw)
         if property_list_addr_raw != 0:
             # define objc_property_list struct
-            DataUtilities.createData(currentProgram, property_list_addr, objc_property_list,
-                                     0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+            setData(property_list_addr, objc_property_list)
             property_count = getDataAt(property_list_addr).getInt(4)
 
             # define objc_property struct
             for i in range(property_count):
                 property_addr = toAddress(
                     property_list_addr_raw + 8 + 16 * i)
-                DataUtilities.createData(
-                    currentProgram, property_addr, objc_property, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
+                setData(property_addr, objc_property)
 
         # create label
         createLabel(cu.address, '{}'.format(class_name), True)
