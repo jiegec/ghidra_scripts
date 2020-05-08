@@ -136,6 +136,7 @@ if __name__ == '__main__':
     objc_property = getDataType("/objc_property")
 
     objc_ref = getDataType("/objc_ref")
+    uint32_t = getDataType("/dword")
 
     cp = currentProgram
     # 48 bits
@@ -400,5 +401,19 @@ if __name__ == '__main__':
                     # define obj_ref struct
                     setData(cu.address, objc_ref)
 
+                else:
+                    break
+
+    # iterate ivar offsets
+    for seg in cp.memory.blocks:
+        if seg.name == '__objc_ivar':
+            print('found section {} @ {}, adding labels for ivar offsets'.format(
+                seg.name, seg.start))
+            codeUnits = cp.getListing().getCodeUnits(seg.start, True)
+            while codeUnits.hasNext():
+                cu = codeUnits.next()
+                if cu and cu.address < seg.end:
+                    # define uint32_t struct
+                    setData(cu.address, uint32_t)
                 else:
                     break
