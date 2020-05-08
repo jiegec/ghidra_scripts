@@ -322,9 +322,12 @@ if __name__ == '__main__':
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
+                    # define obj_ref struct
+                    set_data(cu.address, objc_ref)
+
                     # define obj_class struct
                     class_addr = to_address(
-                        cu.getValue().getOffset() & mask)
+                        cu.getLong(0) & mask)
                     set_data(class_addr, objc_class)
                     classes.add(class_addr)
 
@@ -332,10 +335,11 @@ if __name__ == '__main__':
                     data = getDataAt(class_addr)
                     metaclass_addr = to_address(
                         data.getLong(0) & mask)
-                    while metaclass_addr not in classes and metaclass_addr.getOffset() >= min_addr:
+                    while metaclass_addr not in classes and metaclass_addr >= min_addr:
 
                         # recursive
                         set_data(metaclass_addr, objc_class)
+                        classes.add(metaclass_addr)
                         data = getDataAt(metaclass_addr)
                         metaclass_addr = to_address(
                             data.getLong(0) & mask)
@@ -345,6 +349,7 @@ if __name__ == '__main__':
 
     # analyze classes
     for class_addr in classes:
+        print('class at {}'.format(class_addr))
         data = getDataAt(class_addr)
         set_data(class_addr, objc_class)
 
@@ -505,6 +510,13 @@ if __name__ == '__main__':
                     # define obj_ref struct
                     set_data(cu.address, objc_ref)
 
+                    # find protocol
+                    protocol_addr_raw = cu.getLong(0) & mask
+                    protocol_obj = getDataAt(to_address(protocol_addr_raw))
+                    if protocol_obj:
+                        createLabel(cu.address, 'ref_{}'.format(
+                            protocol_obj.getLabel()), True)
+
                 else:
                     break
 
@@ -519,6 +531,13 @@ if __name__ == '__main__':
                 if cu and cu.address < seg.end:
                     # define obj_ref struct
                     set_data(cu.address, objc_ref)
+
+                    # find class
+                    class_addr_raw = cu.getLong(0) & mask
+                    class_obj = getDataAt(to_address(class_addr_raw))
+                    if class_obj:
+                        createLabel(cu.address, 'super_ref_{}'.format(
+                            class_obj.getLabel()), True)
 
                 else:
                     break
