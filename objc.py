@@ -330,9 +330,9 @@ if __name__ == '__main__':
                         cu.getLong(0) & mask)
                     set_data(class_addr, objc_class)
                     classes.add(class_addr)
+                    data = getDataAt(class_addr)
 
                     # find metaclass
-                    data = getDataAt(class_addr)
                     metaclass_addr = to_address(
                         data.getLong(0) & mask)
                     while metaclass_addr not in classes and metaclass_addr >= min_addr:
@@ -349,7 +349,6 @@ if __name__ == '__main__':
 
     # analyze classes
     for class_addr in classes:
-        print('class at {}'.format(class_addr))
         data = getDataAt(class_addr)
         set_data(class_addr, objc_class)
 
