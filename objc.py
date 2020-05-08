@@ -314,6 +314,13 @@ if __name__ == '__main__':
                     ivars_addr_raw + 8 + 32 * i)
                 setData(ivar_addr, objc_ivar)
 
+                # get ivar name
+                ivar_name_addr = toAddress(getDataAt(ivar_addr).getLong(8) & mask)
+                ivar_name = getDataAt(ivar_name_addr).getValue()
+                print('name at {} = {}'.format(ivar_name_addr, ivar_name))
+                createLabel(ivar_addr, 'ivar_{}::{}'.format(
+                    getDataAt(name_addr).getValue(), ivar_name), True)
+
         # find property_list
         property_list_addr_raw = getDataAt(
             data_addr).getLong(64) & mask
