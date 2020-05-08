@@ -132,6 +132,28 @@ if __name__ == '__main__':
         uint64_t len;
     };
     """)
+    createDataType("""
+    struct objc_protocol {
+        uint64_t isa: 48;
+        uint64_t ignore1: 16;
+        uint64_t name: 48;
+        uint64_t ignore2: 16;
+        uint64_t protocols: 48;
+        uint64_t ignore3: 16;
+        uint64_t instance_methods: 48;
+        uint64_t ignore4: 16;
+        uint64_t class_methods: 48;
+        uint64_t ignore5: 16;
+        uint64_t optional_instance_methods: 48;
+        uint64_t ignore6: 16;
+        uint64_t optional_class_methods: 48;
+        uint64_t ignore7: 16;
+        uint64_t instance_properties: 48;
+        uint64_t ignore8: 16;
+        uint32_t size;
+        uint32_t flags;
+    };
+    """)
 
     objc_class = getDataType("/objc_class")
     objc_data = getDataType("/objc_data")
@@ -144,6 +166,8 @@ if __name__ == '__main__':
 
     objc_property_list = getDataType("/objc_property_list")
     objc_property = getDataType("/objc_property")
+
+    objc_protocol = getDataType("/objc_protocol")
 
     objc_ref = getDataType("/objc_ref")
     objc_cfstring = getDataType("/objc_cfstring")
@@ -382,6 +406,28 @@ if __name__ == '__main__':
                     if class_obj:
                         createLabel(cu.address, 'ref_{}'.format(
                             class_obj.getLabel()), True)
+
+                else:
+                    break
+
+    # iterate protocol lists
+    for seg in cp.memory.blocks:
+        if seg.name == '__objc_protolist':
+            print('found section {} @ {}, adding labels for protocol lists'.format(
+                seg.name, seg.start))
+            codeUnits = cp.getListing().getCodeUnits(seg.start, True)
+            while codeUnits.hasNext():
+                cu = codeUnits.next()
+                if cu and cu.address < seg.end:
+                    # define obj_ref struct
+                    setData(cu.address, objc_ref)
+
+                    # parse protocol
+                    protocol_addr = toAddress(cu.getLong(0) & mask)
+                    setData(protocol_addr, objc_protocol)
+                    name_addr = toAddress(
+                        getDataAt(protocol_addr).getLong(8) & mask)
+                    createLabel(protocol_addr, 'protocol_{}'.format(getDataAt(name_addr).getValue()), True)
 
                 else:
                     break
