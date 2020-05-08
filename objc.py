@@ -214,7 +214,7 @@ if __name__ == '__main__':
                     string = getDataAt(real_addr).getValue()
                     string = re.sub(r'[^0-9a-zA-Z:@%]', '_', string)
                     createLabel(
-                        cu.address, '@cfstring({})'.format(string), True)
+                        cu.address, 'cfstring_{}'.format(string), True)
                 else:
                     break
 
@@ -282,14 +282,14 @@ if __name__ == '__main__':
                 method_name_addr = toAddress(
                     getDataAt(method_addr).getLong(0) & mask)
                 method_name = getDataAt(method_name_addr)
-                createLabel(method_addr, '{}::{}'.format(
+                createLabel(method_addr, 'method_{}::{}'.format(
                     class_name, method_name.getValue()), True)
 
                 # get imp addr
                 imp_addr = toAddress(
                     (getDataAt(method_addr).getLong(16) & mask) + text_section_addr)
                 imp = getFunctionAt(imp_addr)
-                name = '{}::{}'.format(
+                name = 'method_{}::{}'.format(
                     class_name, method_name.getValue())
                 if imp:
                     imp.setName(name, SourceType.ANALYSIS)
@@ -317,7 +317,6 @@ if __name__ == '__main__':
                 # get ivar name
                 ivar_name_addr = toAddress(getDataAt(ivar_addr).getLong(8) & mask)
                 ivar_name = getDataAt(ivar_name_addr).getValue()
-                print('name at {} = {}'.format(ivar_name_addr, ivar_name))
                 createLabel(ivar_addr, 'ivar_{}::{}'.format(
                     getDataAt(name_addr).getValue(), ivar_name), True)
 
@@ -344,12 +343,12 @@ if __name__ == '__main__':
                     getDataAt(name_addr).getValue(), property_name), True)
 
         # create label
-        createLabel(cu.address, '{}'.format(class_name), True)
+        createLabel(cu.address, 'class_{}'.format(class_name), True)
         createLabel(
-            class_addr, '{}_class'.format(class_name), True)
-        createLabel(data_addr, '{}_data'.format(class_name), True)
+            class_addr, 'class_{}'.format(class_name), True)
+        createLabel(data_addr, 'data_{}'.format(class_name), True)
         if method_list_addr_raw != 0:
-            createLabel(method_list_addr, '{}_method_list'.format(
+            createLabel(method_list_addr, 'method_list_{}'.format(
                 getDataAt(name_addr).getValue()), True)
 
     # iterate class refs
@@ -368,7 +367,7 @@ if __name__ == '__main__':
                     class_addr_raw = cu.getLong(0) & mask
                     class_obj = getDataAt(toAddress(class_addr_raw))
                     if class_obj:
-                        createLabel(cu.address, '{}_ref'.format(
+                        createLabel(cu.address, 'ref_{}'.format(
                             class_obj.getLabel()), True)
 
                 else:
