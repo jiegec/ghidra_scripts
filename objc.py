@@ -4,7 +4,9 @@ from ghidra.program.model.data import DataUtilities
 from ghidra.program.model.symbol import SourceType
 from ghidra.app.util.cparser.C import CParser
 
+# Referenced from:
 # https://reverseengineering.stackexchange.com/questions/23330/ghidra-python-create-struct-with-big-endian-field
+# https://github.com/PAGalaxyLab/ghidra_scripts/blob/master/AnalyzeOCMsgSend.py
 
 def create_data_type(txt):
     data_type_manager = currentProgram.getDataTypeManager()
