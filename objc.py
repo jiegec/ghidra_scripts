@@ -31,6 +31,9 @@ def setData(addr, ty):
 
 
 def parseMethodList(method_list_addr_raw, class_name):
+    if not (min_addr.getOffset() < method_list_addr_raw and method_list_addr_raw < max_addr.getOffset()):
+        return
+
     method_list_addr = cu.address.getNewAddress(
         method_list_addr_raw)
     if method_list_addr_raw != 0:
@@ -190,6 +193,12 @@ if __name__ == '__main__':
         uint64_t ignore8: 16;
         uint32_t size;
         uint32_t flags;
+        uint64_t extended_method_types: 48;
+        uint64_t ignore10: 16;
+        uint64_t demangled_name: 48;
+        uint64_t ignore11: 16;
+        uint64_t class_properties: 48;
+        uint64_t ignore12: 16;
     };
     """)
 
@@ -439,16 +448,20 @@ if __name__ == '__main__':
                         protocol_name), True)
 
                     # parse instance method list
-                    instance_method_list_addr_raw = getDataAt(protocol_addr).getLong(24) & mask
-                    if min_addr.getOffset() < instance_method_list_addr_raw and instance_method_list_addr_raw < max_addr.getOffset():
-                        parseMethodList(
-                            instance_method_list_addr_raw, protocol_name)
+                    parseMethodList(
+                        getDataAt(protocol_addr).getLong(24) & mask, protocol_name)
 
                     # parse class method list
-                    class_method_list_addr_raw = getDataAt(protocol_addr).getLong(32) & mask
-                    if min_addr.getOffset() < class_method_list_addr_raw and class_method_list_addr_raw < max_addr.getOffset():
-                        parseMethodList(
-                            class_method_list_addr_raw, protocol_name)
+                    parseMethodList(
+                        getDataAt(protocol_addr).getLong(32) & mask, protocol_name)
+
+                    # parse optional instance method list
+                    parseMethodList(
+                        getDataAt(protocol_addr).getLong(40) & mask, protocol_name)
+
+                    # parse optional class method list
+                    parseMethodList(
+                        getDataAt(protocol_addr).getLong(48) & mask, protocol_name)
 
                 else:
                     break
