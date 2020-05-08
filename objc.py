@@ -24,6 +24,7 @@ def getDataType(name):
 def toAddress(addr):
     return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(addr)
 
+
 def setData(addr, ty):
     DataUtilities.createData(
         currentProgram, addr, ty, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
@@ -109,6 +110,12 @@ if __name__ == '__main__':
         uint64_t ignore2: 16;
     };
     """)
+    createDataType("""
+    struct objc_class_ref {
+        uint64_t ref: 48;
+        uint64_t ignore1: 16;
+    };
+    """)
 
     objc_class = getDataType("/objc_class")
     objc_data = getDataType("/objc_data")
@@ -121,6 +128,8 @@ if __name__ == '__main__':
 
     objc_property_list = getDataType("/objc_property_list")
     objc_property = getDataType("/objc_property")
+
+    objc_class_ref = getDataType("/objc_class_ref")
 
     cp = currentProgram
     # 48 bits
@@ -296,7 +305,7 @@ if __name__ == '__main__':
                     ivars_addr_raw + 8 + 32 * i)
                 setData(ivar_addr, objc_ivar)
 
-        # find propertys
+        # find property_list
         property_list_addr_raw = getDataAt(
             data_addr).getLong(64) & mask
         property_list_addr = toAddress(
@@ -320,3 +329,25 @@ if __name__ == '__main__':
         if method_list_addr_raw != 0:
             createLabel(method_list_addr, '{}_method_list'.format(
                 getDataAt(name_addr).getValue()), True)
+
+    # iterate class refs
+    for seg in cp.memory.blocks:
+        if seg.name == '__objc_classrefs':
+            print('found section {} @ {}, adding labels for class refs'.format(
+                seg.name, seg.start))
+            codeUnits = cp.getListing().getCodeUnits(seg.start, True)
+            while codeUnits.hasNext():
+                cu = codeUnits.next()
+                if cu and cu.address < seg.end:
+                    # define obj_class_ref struct
+                    setData(cu.address, objc_class_ref)
+
+                    # find propertys
+                    class_addr_raw = cu.getLong(0) & mask
+                    class_obj = getDataAt(toAddress(class_addr_raw))
+                    if class_obj:
+                        createLabel(cu.address, '{}_ref'.format(
+                            class_obj.getLabel()), True)
+
+                else:
+                    break
