@@ -337,6 +337,12 @@ if __name__ == '__main__':
                     property_list_addr_raw + 8 + 16 * i)
                 setData(property_addr, objc_property)
 
+                # get property name
+                property_name_addr = toAddress(getDataAt(property_addr).getLong(0) & mask)
+                property_name = getDataAt(property_name_addr).getValue()
+                createLabel(property_addr, 'property_{}::{}'.format(
+                    getDataAt(name_addr).getValue(), property_name), True)
+
         # create label
         createLabel(cu.address, '{}'.format(class_name), True)
         createLabel(
