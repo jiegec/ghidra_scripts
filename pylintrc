@@ -1,0 +1,2 @@
+[VARIABLES]
+additional-builtins=createLabel,disassemble,createFunction,currentProgram,getDataAt

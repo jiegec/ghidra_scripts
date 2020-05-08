@@ -1,6 +1,5 @@
 import re
 from ghidra.program.model.data import DataTypeConflictHandler
-from ghidra.program.model.data import EndianSettingsDefinition
 from ghidra.program.model.data import DataUtilities
 from ghidra.program.model.symbol import SourceType
 from ghidra.app.util.cparser.C import CParser
@@ -25,12 +24,12 @@ def toAddress(addr):
     return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(addr)
 
 
-def setData(addr, ty):
+def set_data(addr, ty):
     DataUtilities.createData(
         currentProgram, addr, ty, 0, False, DataUtilities.ClearDataMode.CLEAR_ALL_CONFLICT_DATA)
 
 
-def parseMethodList(method_list_addr_raw, class_name):
+def parse_method_list(method_list_addr_raw, class_name):
     if not (min_addr.getOffset() < method_list_addr_raw and method_list_addr_raw < max_addr.getOffset()):
         return
 
@@ -38,7 +37,7 @@ def parseMethodList(method_list_addr_raw, class_name):
         method_list_addr_raw)
     if method_list_addr_raw != 0:
         # define objc_method_list struct
-        setData(method_list_addr, objc_method_list)
+        set_data(method_list_addr, objc_method_list)
 
         method_count = getDataAt(method_list_addr).getInt(4)
 
@@ -46,7 +45,7 @@ def parseMethodList(method_list_addr_raw, class_name):
         for i in range(method_count):
             method_addr = toAddress(
                 method_list_addr_raw + 8 + 24 * i)
-            setData(method_addr, objc_method)
+            set_data(method_addr, objc_method)
             method_name_addr = toAddress(
                 getDataAt(method_addr).getLong(0) & mask)
             method_name = getDataAt(method_name_addr)
@@ -76,11 +75,16 @@ if __name__ == '__main__':
     # https://opensource.apple.com/source/objc4/objc4-237/runtime/objc-class.h.auto.html
     createDataType("""
     struct objc_class {
-        uint64_t metaclass;
-        uint64_t superclass;
-        uint64_t cache;
-        uint64_t vtable;
-        uint64_t data;
+        uint64_t metaclass: 48;
+        uint64_t ignore1: 16;
+        uint64_t superclass: 48;
+        uint64_t ignore2: 16;
+        uint64_t cache: 48;
+        uint64_t ignore3: 16;
+        uint64_t vtable: 48;
+        uint64_t ignore4: 16;
+        uint64_t data: 48;
+        uint64_t ignore5: 16;
     };
     """)
     createDataType("""
@@ -201,6 +205,11 @@ if __name__ == '__main__':
         uint64_t ignore12: 16;
     };
     """)
+    createDataType("""
+    struct objc_protocol_list {
+        uint32_t protocol_count;
+    };
+    """)
 
     objc_class = getDataType("/objc_class")
     objc_data = getDataType("/objc_data")
@@ -215,6 +224,7 @@ if __name__ == '__main__':
     objc_property = getDataType("/objc_property")
 
     objc_protocol = getDataType("/objc_protocol")
+    objc_protocol_list = getDataType("/objc_protocol_list")
 
     objc_ref = getDataType("/objc_ref")
     objc_cfstring = getDataType("/objc_cfstring")
@@ -261,7 +271,7 @@ if __name__ == '__main__':
                         cu.getLong(0) & mask)
                     if real_addr in method_names:
                         # define obj_ref struct
-                        setData(cu.address, objc_ref)
+                        set_data(cu.address, objc_ref)
 
                         createLabel(cu.address, '@selector({})'.format(
                             method_names[real_addr]), True)
@@ -295,10 +305,10 @@ if __name__ == '__main__':
                     real_addr = toAddress(
                         cu.getLong(16) & mask)
                     string = getDataAt(real_addr).getValue()
-                    string = re.sub(r'[^0-9a-zA-Z:@%;.]', '_', string)
+                    string = re.sub(r'[^0-9a-zA-Z:@%;.,]', '_', string)
                     createLabel(
                         cu.address, 'cfstring_{}'.format(string), True)
-                    setData(cu.address, objc_cfstring)
+                    set_data(cu.address, objc_cfstring)
                 else:
                     break
 
@@ -315,7 +325,7 @@ if __name__ == '__main__':
                     # define obj_class struct
                     class_addr = toAddress(
                         cu.getValue().getOffset() & mask)
-                    setData(class_addr, objc_class)
+                    set_data(class_addr, objc_class)
                     classes.add(class_addr)
 
                     # find metaclass
@@ -325,7 +335,7 @@ if __name__ == '__main__':
                     while metaclass_addr not in classes and metaclass_addr.getOffset() >= min_addr:
 
                         # recursive
-                        setData(metaclass_addr, objc_class)
+                        set_data(metaclass_addr, objc_class)
                         data = getDataAt(metaclass_addr)
                         metaclass_addr = toAddress(
                             data.getLong(0) & mask)
@@ -336,13 +346,13 @@ if __name__ == '__main__':
     # analyze classes
     for class_addr in classes:
         data = getDataAt(class_addr)
-        setData(class_addr, objc_class)
+        set_data(class_addr, objc_class)
 
         # find data
         data_addr = toAddress(
             data.getLong(32) & mask)
         # define obj_data struct
-        setData(data_addr, objc_data)
+        set_data(data_addr, objc_data)
         name_addr = toAddress(
             getDataAt(data_addr).getLong(24) & mask)
         class_name = getDataAt(name_addr).getValue()
@@ -350,7 +360,24 @@ if __name__ == '__main__':
         # find method list
         method_list_addr_raw = getDataAt(
             data_addr).getLong(32) & mask
-        parseMethodList(method_list_addr_raw, class_name)
+        parse_method_list(method_list_addr_raw, class_name)
+
+        # find base protocols list
+        base_protocols_addr_raw = getDataAt(
+            data_addr).getLong(40) & mask
+        if base_protocols_addr_raw != 0:
+            base_protocols_addr = toAddress(
+                base_protocols_addr_raw)
+            # define objc_protocol_list struct
+            set_data(base_protocols_addr, objc_protocol_list)
+
+            protocol_count = getDataAt(base_protocols_addr).getInt(0)
+
+            # define objc_ref struct
+            for i in range(protocol_count):
+                protocol_ref_addr = toAddress(
+                    base_protocols_addr_raw + 4 + 4 * i)
+                set_data(protocol_ref_addr, objc_ref)
 
         # find ivars
         ivars_addr_raw = getDataAt(
@@ -359,14 +386,14 @@ if __name__ == '__main__':
             ivars_addr_raw)
         if ivars_addr_raw != 0:
             # define objc_ivars_list struct
-            setData(ivars_addr, objc_ivars_list)
+            set_data(ivars_addr, objc_ivars_list)
             ivars_count = getDataAt(ivars_addr).getInt(4)
 
             # define objc_ivar struct
             for i in range(ivars_count):
                 ivar_addr = toAddress(
                     ivars_addr_raw + 8 + 32 * i)
-                setData(ivar_addr, objc_ivar)
+                set_data(ivar_addr, objc_ivar)
 
                 # get ivar name
                 ivar_name_addr = toAddress(
@@ -382,14 +409,14 @@ if __name__ == '__main__':
             property_list_addr_raw)
         if property_list_addr_raw != 0:
             # define objc_property_list struct
-            setData(property_list_addr, objc_property_list)
+            set_data(property_list_addr, objc_property_list)
             property_count = getDataAt(property_list_addr).getInt(4)
 
             # define objc_property struct
             for i in range(property_count):
                 property_addr = toAddress(
                     property_list_addr_raw + 8 + 16 * i)
-                setData(property_addr, objc_property)
+                set_data(property_addr, objc_property)
 
                 # get property name
                 property_name_addr = toAddress(
@@ -414,7 +441,7 @@ if __name__ == '__main__':
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define obj_ref struct
-                    setData(cu.address, objc_ref)
+                    set_data(cu.address, objc_ref)
 
                     # find class
                     class_addr_raw = cu.getLong(0) & mask
@@ -436,11 +463,11 @@ if __name__ == '__main__':
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define obj_ref struct
-                    setData(cu.address, objc_ref)
+                    set_data(cu.address, objc_ref)
 
                     # parse protocol
                     protocol_addr = toAddress(cu.getLong(0) & mask)
-                    setData(protocol_addr, objc_protocol)
+                    set_data(protocol_addr, objc_protocol)
                     name_addr = toAddress(
                         getDataAt(protocol_addr).getLong(8) & mask)
                     protocol_name = getDataAt(name_addr).getValue()
@@ -448,19 +475,19 @@ if __name__ == '__main__':
                         protocol_name), True)
 
                     # parse instance method list
-                    parseMethodList(
+                    parse_method_list(
                         getDataAt(protocol_addr).getLong(24) & mask, protocol_name)
 
                     # parse class method list
-                    parseMethodList(
+                    parse_method_list(
                         getDataAt(protocol_addr).getLong(32) & mask, protocol_name)
 
                     # parse optional instance method list
-                    parseMethodList(
+                    parse_method_list(
                         getDataAt(protocol_addr).getLong(40) & mask, protocol_name)
 
                     # parse optional class method list
-                    parseMethodList(
+                    parse_method_list(
                         getDataAt(protocol_addr).getLong(48) & mask, protocol_name)
 
                 else:
@@ -476,7 +503,7 @@ if __name__ == '__main__':
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define obj_ref struct
-                    setData(cu.address, objc_ref)
+                    set_data(cu.address, objc_ref)
 
                 else:
                     break
@@ -491,7 +518,7 @@ if __name__ == '__main__':
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define obj_ref struct
-                    setData(cu.address, objc_ref)
+                    set_data(cu.address, objc_ref)
 
                 else:
                     break
@@ -506,6 +533,6 @@ if __name__ == '__main__':
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
                     # define uint32_t struct
-                    setData(cu.address, uint32_t)
+                    set_data(cu.address, uint32_t)
                 else:
                     break
