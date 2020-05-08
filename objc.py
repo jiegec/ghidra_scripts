@@ -116,6 +116,12 @@ if __name__ == '__main__':
         uint64_t ignore1: 16;
     };
     """)
+    createDataType("""
+    struct objc_ref {
+        uint64_t ref: 48;
+        uint64_t ignore1: 16;
+    };
+    """)
 
     objc_class = getDataType("/objc_class")
     objc_data = getDataType("/objc_data")
@@ -129,7 +135,7 @@ if __name__ == '__main__':
     objc_property_list = getDataType("/objc_property_list")
     objc_property = getDataType("/objc_property")
 
-    objc_class_ref = getDataType("/objc_class_ref")
+    objc_ref = getDataType("/objc_ref")
 
     cp = currentProgram
     # 48 bits
@@ -171,6 +177,9 @@ if __name__ == '__main__':
                     real_addr = toAddress(
                         cu.getLong(0) & mask)
                     if real_addr in method_names:
+                        # define obj_ref struct
+                        setData(cu.address, objc_ref)
+
                         createLabel(cu.address, '@selector({})'.format(
                             method_names[real_addr]), True)
                 else:
@@ -339,15 +348,45 @@ if __name__ == '__main__':
             while codeUnits.hasNext():
                 cu = codeUnits.next()
                 if cu and cu.address < seg.end:
-                    # define obj_class_ref struct
-                    setData(cu.address, objc_class_ref)
+                    # define obj_ref struct
+                    setData(cu.address, objc_ref)
 
-                    # find propertys
+                    # find class
                     class_addr_raw = cu.getLong(0) & mask
                     class_obj = getDataAt(toAddress(class_addr_raw))
                     if class_obj:
                         createLabel(cu.address, '{}_ref'.format(
                             class_obj.getLabel()), True)
+
+                else:
+                    break
+
+    # iterate protocol refs
+    for seg in cp.memory.blocks:
+        if seg.name == '__objc_protorefs':
+            print('found section {} @ {}, adding labels for protocol refs'.format(
+                seg.name, seg.start))
+            codeUnits = cp.getListing().getCodeUnits(seg.start, True)
+            while codeUnits.hasNext():
+                cu = codeUnits.next()
+                if cu and cu.address < seg.end:
+                    # define obj_ref struct
+                    setData(cu.address, objc_ref)
+
+                else:
+                    break
+
+    # iterate super refs
+    for seg in cp.memory.blocks:
+        if seg.name == '__objc_superrefs':
+            print('found section {} @ {}, adding labels for super refs'.format(
+                seg.name, seg.start))
+            codeUnits = cp.getListing().getCodeUnits(seg.start, True)
+            while codeUnits.hasNext():
+                cu = codeUnits.next()
+                if cu and cu.address < seg.end:
+                    # define obj_ref struct
+                    setData(cu.address, objc_ref)
 
                 else:
                     break
