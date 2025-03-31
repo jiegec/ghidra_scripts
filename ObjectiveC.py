@@ -1,3 +1,11 @@
+#Add Objective-C data type parsing
+#@author Jiajie Chen
+#@category Languages
+#@keybinding 
+#@menupath 
+#@toolbar 
+#@runtime Jython
+
 import re
 from ghidra.program.model.data import DataTypeConflictHandler
 from ghidra.program.model.data import DataUtilities
